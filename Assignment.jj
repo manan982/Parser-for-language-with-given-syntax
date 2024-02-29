@@ -1,0 +1,655 @@
+// setting a global lookahead value. This represents the number of tokens to look ahead when making choice decisions..
+
+options {
+    LOOKAHEAD = 2;
+}
+
+PARSER_BEGIN(Assignment) // Java compilation unit between PARSER_BEGIN and PARSER_END
+import java.util.*;
+
+interface interpreter {
+    
+    // every expressions' element will have this interface utilised
+
+    public int interpret(TreeMap<String, Integer> indivArgument) throws errorInterpret; 
+    
+    // given paramaters and thier respective mapped numeric values, calculate the element of the expression
+    // will throw error message if during interpreation an error occurs
+    
+    public long findLNumber(); 
+    // calling the function to find the line number of the elemnt causing the error
+
+}
+
+// used for a instance of a paramater in the function
+
+class funcPrmtr extends locateLine implements interpreter {
+    public String functionName;
+
+    public funcPrmtr(Token Tkn) {
+        
+        // paramater represented by token
+        super(Tkn);
+        this.functionName = Tkn.image;
+    }
+
+    // Checks mapping and identifies paramaters value
+    
+    public int interpret(TreeMap<String, Integer> indivArgument) {
+        return indivArgument.get(functionName);
+    }
+
+    public String toString() {
+        return functionName;
+    }
+}
+
+// used to identify the line where a particular element is causing the error
+// used token based constructor to take tokens starting position as starting line number 
+
+class locateLine {
+
+    public long lNumber;
+
+    public locateLine(Token Tkn) {
+        this.lNumber = Tkn.beginLine;
+
+        // using a constructor to define that the position that token begins at is the initial line number 
+    }
+
+    public locateLine(long lNumber  ) {
+        this.lNumber = lNumber;
+    }
+
+    public long findLNumber() {
+        return lNumber;
+    }
+}
+
+// allows a function to be called along with arithmetic arguments stored in one array .
+
+class wholeFunc extends locateLine {
+    public String functionName;
+    public String[] indivArgument; // named parameter array 
+    public interpreter input; // the expression to be input, which is the function body 
+
+    public wholeFunc(String functionName, String[] indivArgument, interpreter input, long lNumber) {
+        super(lNumber); // line number at which the function is located
+        this.functionName = functionName;
+        this.indivArgument = indivArgument;
+        this.input = input;
+    }
+
+    // Takes the arithmetic values that have been mapped to func parameters, and start intepreting the function
+
+    public int interpret(int[] indivArgument) throws errorInterpret {
+    
+    // all elements utilising interpret will require a respective value along with thier named paramaters, so create this link 
+
+    TreeMap<String, Integer> evalArgument = new TreeMap<String, Integer>();
+        for (int a = 0; a < indivArgument.length; a++) {
+            evalArgument.put(this.indivArgument[a], indivArgument[a]);
+        }
+        
+        // interpret the function body
+        return input.interpret(evalArgument);
+    }
+}
+
+// Used for when addition needs to be performed in the expression
+
+class funcAddition extends locateLine implements interpreter {
+    public interpreter firstAdditionVal;
+    public interpreter secondAdditionVal;
+    public int totalSumResult;
+
+
+   // summing each evaluated argument into a total
+    public int interpret(TreeMap<String, Integer> indivArgument) throws errorInterpret {
+        totalSumResult = firstAdditionVal.interpret(indivArgument) + secondAdditionVal.interpret(indivArgument);
+
+        return totalSumResult;
+    }
+
+
+    public funcAddition(interpreter firstAdditionVal, interpreter secondAdditionVal, long lNumber) {
+        super(lNumber);
+        this.firstAdditionVal = firstAdditionVal;
+        this.secondAdditionVal = secondAdditionVal;
+        this.totalSumResult = totalSumResult;
+    }
+}
+
+// Used for when multiplication needs to be performed in the expression
+
+class funcMultiplication extends locateLine implements interpreter {
+    public interpreter firstMultiplier;
+    public interpreter secondMultiplier;
+    public int prodResult;
+
+
+    // multiplying each argument together to achieve a final result value
+
+    public int interpret(TreeMap<String, Integer> indivArgument) throws errorInterpret {
+        prodResult = firstMultiplier.interpret(indivArgument) * secondMultiplier.interpret(indivArgument);
+
+        return prodResult;
+    }
+
+      
+    public funcMultiplication(interpreter firstMultiplier, interpreter secondMultiplier, long lNumber) {
+        super(lNumber);
+        this.firstMultiplier = firstMultiplier;
+        this.secondMultiplier = secondMultiplier;
+        this.prodResult = prodResult;
+    }
+
+}
+
+
+// is used for a instance of a integer in the function
+
+class funcInteger extends locateLine implements interpreter {
+    public int integerVal;
+
+    public funcInteger(Token Tkn) {
+
+        // using a constructor to define that the integer maps to the token  
+        super(Tkn);
+        this.integerVal = Integer.parseInt(Tkn.image);
+    }
+
+   
+    // returns the integers value, ignoring paramaters  
+
+    public int interpret(TreeMap<String, Integer> indivArgument) {
+        return integerVal;
+    }
+
+    // converting integer value to string
+
+    public String toString() {
+        return Integer.toString(integerVal);
+    }
+}
+
+// used for an instance of a function call in the whole function 
+
+class singleFunc extends locateLine implements interpreter {
+    public String wholeFunc;
+    public interpreter[] indivArgument;
+
+    public singleFunc(Token Tkn, interpreter[] indivArgument) {
+
+        // using a constructor to define that the function being called maps to this token      
+        super(Tkn);
+        this.wholeFunc = Tkn.image;
+        this.indivArgument = indivArgument;
+    }
+
+   
+
+    public int interpret(TreeMap<String, Integer> indivArgument) throws errorInterpret {
+        int output; // value to be returned
+        
+        // search through the list of function calls
+
+        if (dataStructures.divergenceFunc.search(this) < 0) {
+            assert true;    
+        }
+        
+        // and if encounter a previously encountered call then DIVERGENCE case occurs, as this is a instance of recursion
+        
+        else {
+            throw new errorInterpret();
+        }
+        
+        // if recursion loop does not exist, then can add the function call to the existing stack
+
+        dataStructures.divergenceFunc.push(this);
+
+        int[] numArguments = new int[this.indivArgument.length];
+        
+        // the paramaters that are passed into the function will be interpreted
+
+        for (int a = 0; a < numArguments.length; a++) {
+            numArguments[a] = this.indivArgument[a].interpret(indivArgument);
+        }
+        
+        output = dataStructures.funcTree.get(wholeFunc).interpret(numArguments);
+       
+        // The same function call can be repeated without a DIVERGENCE result, so we need to take divergenceFunc stack and remove this function call from it
+        dataStructures.divergenceFunc.pop();
+
+        return output;
+    }
+
+    // used to convert the function instance to a string representation so that outputting the undefined function name error can be readable   
+
+    public String toString() {
+        String undefinedFuncName = wholeFunc + "["; // square bracket for readability and specifiying function name 
+        for (int a = 0; a < indivArgument.length; a++) {
+            if ((indivArgument.length - 1) != a) {
+                undefinedFuncName += "," + indivArgument[a];
+            } else {
+                undefinedFuncName += indivArgument[a];
+            }
+        }
+        return undefinedFuncName + "]";
+    }
+}
+
+class errorInterpret extends Exception { 
+    
+    public errorInterpret() {
+        super();
+    }
+}
+
+class dataStructures {
+    public static Stack <singleFunc> divergenceFunc = new Stack <singleFunc> ();
+    // Stores all function calls when evaluating a function that will cause a output of DIVERGENCE due to recursion 
+    
+    public static LinkedHashSet <singleFunc> expressions = new LinkedHashSet <singleFunc> ();
+    // Stores all function calls during the program that will be authenticated during parsing
+    
+    public static TreeMap <String, wholeFunc> funcTree = new TreeMap <String, wholeFunc> ();
+    // Stores all functions that are defined and thier respective function objects
+}
+
+public class Assignment {
+    
+    public static void main(String[] indivArgument) throws errorInterpret, TokenMgrError {
+        
+        boolean parse = false;
+        boolean interpret = true;
+        
+        Assignment PLMparse = new Assignment(System.in);
+        
+        try {
+            PLMparse.mainParser();
+
+
+        } catch (ParseException error) {
+
+            // throw exception whilst parsing
+
+            interpret = false;
+            System.out.println("FAIL");
+            System.err.println(error.getMessage());
+        
+        // catches an error if there is a line break after a semi colon, at the end of a function definition
+
+        } catch (TokenMgrError error) {
+            System.err.println("Lexical Error." + "\n" + "Space encountered after ;");  
+            System.exit(1);
+        }
+
+        if (interpret) { 
+            if (parse) {
+                for (String funcName: dataStructures.funcTree.keySet()) { 
+                    System.out.println(funcName);
+                }
+            }
+
+            System.out.println("PASS");
+
+            try {         
+                System.out.println(dataStructures.funcTree.get("MAIN").interpret(new int[0]));
+            } catch (errorInterpret error) {
+                System.out.println("DIVERGENCE");
+            } 
+
+        }
+    }
+}
+
+PARSER_END(Assignment)
+
+// starting point for when parsing initially begins
+
+void mainParser() : 
+    { wholeFunc function; int a = 1; }
+    // setting the initial line number count to 1
+
+    { ( function = definitionPerLine(a++) 
+    // increment the line number each time a defintion is found. as each program consists of several function definitions, and each one being on a different line
+            
+            { dataStructures.funcTree.put(function.functionName, function); } ) + <EOF> 
+                // every time a new function defintion is encountered after a new line, store in the function tree to indicate a valid function
+                
+            // iterating through the expressions Set to determine which calls in this set are valid
+
+            { for (singleFunc singleExpr : dataStructures.expressions) {
+                if (!dataStructures.funcTree.containsKey(singleExpr.wholeFunc) 
+                
+                || dataStructures.funcTree.get(singleExpr.wholeFunc).indivArgument.length != singleExpr.indivArgument.length) {
+                    throw new ParseException("Error is at Line Number " + singleExpr.lNumber + "\n" + "Contains undefined function name - " + singleExpr);
+                }
+            }
+                    
+            // error handling in the case there is no MAIN function, as all programs must have a MAIN
+
+                // do nothing if MAIN is present
+                if (dataStructures.funcTree.containsKey("MAIN")) { 
+                    assert true;
+                }
+
+                //throw error if MAIN doesnt exist
+                else {
+                    throw new ParseException("Error is at Line Number 0" + "\n" + "No MAIN function.");
+                }
+
+            }
+        }
+
+// taking current line number as a paramater, making valid function defintions 
+
+wholeFunc definitionPerLine(int a) : {
+
+    //initlaising new hashset and arraylists
+
+    LinkedHashSet<String> hashSet = new LinkedHashSet<String>();
+    ArrayList<String> arrayList = new ArrayList<String>();
+    
+    interpreter Intrprtr;
+    Token Tkn;
+}
+
+{       
+
+    // initialising the line number and storing it in a variable
+
+    {int n = token.beginLine;}
+    
+
+    // checking to see if function defintion contains DEF, else is invalid. Finds line number of invalid expression
+     (<keywordDEF>
+      | {throw new ParseException("Error is at Line Number " + (n+1)  + "\n" + "No DEF function."); } )
+
+    
+    <blankSpace> 
+
+    // multi
+    (
+        ( Tkn = <keywordMAIN> ) 
+        // looking for the case that function name is MAIN. do not set parameters if it is MAIN
+            | 
+            ( Tkn = <upCase> 
+            // else function name must be in upper case 
+            ( 
+                
+                // looking for blank space after function name, else output error. Increment line number count to get correct number displayed
+            (<blankSpace> 
+                | 
+                {throw new ParseException("Error is at Line Number " + (n+1)  + "\n" + "Missing Blank Space after function name"); } )
+            
+            // expecting a paramter name to be in complete lowercase . only defined when function name is not MAIN, and upper case.
+
+            (<lowCase>
+
+            // in the case it is not, then reject incorrect inputs of it being in upper case or containing Integers
+
+                | <upCase>
+                {throw new ParseException("Error is at Line Number " + (n+1)  + "\n" + "No Upper Case letters allowed in parameter name"); } 
+                
+                | <INTEGER>
+                {throw new ParseException("Error is at Line Number " + (n+1)  + "\n" + "No numbers allowed in parameter name"); } 
+            )
+
+            
+
+            { arrayList.add(token.image); } 
+                arrayList = matchedParsDef(arrayList) 
+            ) ? 
+
+            // in the case that a function name of MAIN or uppercase is not found, then deal with incorrect cases.
+            // Reject function names when they consist of a integer, lower case or contain DEF
+            // however potential error is that correct error message not displayed if function name contains integer in second spot (X2X)
+
+            | <INTEGER>
+                {throw new ParseException("Integers not allowed in function Name"); } 
+            | <lowCase>
+                {throw new ParseException("Lower case letters not allowed in function Name"); } 
+            | <keywordDEF>
+                {throw new ParseException("DEF not a valid function name"); } 
+          )    
+    ) { hashSet.addAll(arrayList); }
+
+    
+// building up the function body, outputting errors, if element required is missing
+
+    (<blankSpace>
+        | 
+        {throw new ParseException("Error is at Line Number " + (n+1)  + "\n" + "Incorrect Number of Blank Spaces before Left Brace (Require 1)"); } )
+
+    // outputs error if left brace is missing 
+
+    (<leftBrace> 
+        | 
+        {throw new ParseException("Error is at Line Number " + (n+1)  + "\n" + "Missing Left Curly Bracket after parameter name"); } )
+
+    (<blankSpace> 
+      |  
+      {throw new ParseException("Error is at Line Number " + (n+1)  + "\n" + "Incorrect Number of Blank Spaces after Left Brace (Require 1)"); } )
+    
+    Intrprtr = additionRes(hashSet) 
+    
+    (<blankSpace> 
+        |  
+        {throw new ParseException("Error is at Line Number " + (n+1)  + "\n" + "Incorrect Number of Blank Spaces before Right Brace (Require 1)"); } )
+    
+    // outputs error if right brace is missing 
+
+    (<rightBrace> 
+        | 
+        {throw new ParseException("Error is at Line Number " + (n+1)  + "\n" + "Missing Right Curly Bracket after function body"); } )
+    
+    (<blankSpace> 
+        |
+         {throw new ParseException("Error is at Line Number " + (n+1)  + "\n" + "Incorrect Number of Blank Spaces after Right Brace (Require 1) "); } )
+    
+    (<lineBreaks>
+        | {throw new ParseException("New Line"); } )
+
+    {
+        // returns a object displaying the corresponding function that has been matched 
+
+        return new wholeFunc(Tkn.image, arrayList.toArray(new String[arrayList.size()]), Intrprtr, 100000000);
+    }
+
+}
+
+ArrayList<String> matchedParsDef(ArrayList<String> arrayList) : { 
+// used upon DEFINING a function, completes paramater matching taking in a subset of the whole parameter list and outputting a complete list
+    
+    Token Tkn ; 
+} 
+        
+{ ( <blankSpace> Tkn = <lowCase> 
+    { arrayList.add(Tkn.image); } ) * 
+        { return arrayList; }
+}
+
+// highest priority expressions 
+
+interpreter priorityExpr(LinkedHashSet<String> hashSet) : {
+ 
+    List<interpreter> arrayList = new ArrayList<interpreter>();
+    interpreter Intrprtr;
+    Token Tkn;
+}
+
+{
+
+    <lowCase>
+
+{       // checking that lower case paramater name is valid for the expression, after matching has been completed
+
+        if (!hashSet.contains(token.image)) {
+            throw new ParseException ("Error is at Line Number " + token.beginLine + "\n" + "Paramater is invalid for the expression " + token.image );
+        }
+        return new funcPrmtr(token);
+    }
+
+    // matching for an integer 
+    | <INTEGER> 
+    
+    { return new funcInteger(token); } 
+
+    {   int n = token.beginLine;} //initialising line number so error message can be output at this location
+
+    // matching for a valid function call 
+    |  Tkn = <upCase> 
+        
+        // ensures that no space in the function call is allowed, else output error in this case
+        (<leftBracket> 
+        | <blankSpace>
+                {throw new ParseException("Error is at Line Number " + "\n" + "No Whitespace inside the function call"); } )
+
+
+        // matching occcurs to determine all values function can accept 
+
+        ( Intrprtr = additionRes(hashSet) 
+            { arrayList.add(Intrprtr); } 
+                arrayList = matchedParsC(hashSet, arrayList) ) ? 
+                
+            // ensures that no space in the function call is allowed, else output error in this case
+
+            (<rightBracket> 
+            | <blankSpace>
+                {throw new ParseException("Error is at Line Number " + "\n" + "No Whitespace inside the function call"); } )
+
+
+                // if we are surplus to the maximum number of parameters allowed, then output a error 
+                { 
+                    if (arrayList.size() < 2) {
+                        assert true;
+                    }
+                    else {
+                        throw new ParseException("Error is at Line Number = " + Tkn.beginLine + "\n" + "Number of Arguments is surplus. Number used = " + arrayList.size());
+                    }
+           
+
+            singleFunc newC = new singleFunc(Tkn, arrayList.toArray(new interpreter[arrayList.size()]));
+            
+            // adding the new valid function call to the set of expression calls 
+            dataStructures.expressions.add(newC);
+            return newC;
+        }
+}
+
+
+List<interpreter> matchedParsC (LinkedHashSet<String> hashSet, List<interpreter> arrayList) : 
+
+
+// used upon CALLING a function, completes paramater matching taking in a subset of the whole parameter list and outputting a complete list
+
+    { interpreter Intrprtr; } 
+        { ( <blankSpace> Intrprtr = additionRes(hashSet) 
+
+            { arrayList.add(Intrprtr); } ) * 
+                { return arrayList; } // returns full list of all paramaters 
+}
+
+TOKEN:{ 
+    < multiply: "*" > 
+}
+
+
+// Matching for a multiplicative result is set up 
+
+interpreter multiplication (LinkedHashSet<String> hashSet) : { interpreter Intrprtr; } 
+    { Intrprtr = priorityExpr(hashSet) Intrprtr = multiplicResult (hashSet, Intrprtr) 
+    
+    // will return a expression of the next expression of highest priority if multiplcative result cannot be matched
+        { return Intrprtr; }
+}
+
+
+// will complete the actual matching of a multiplicative result
+
+interpreter multiplicResult (LinkedHashSet<String> hashSet, interpreter IntrprtrMult) : { interpreter Intrprtr; } 
+        { ( <multiply> Intrprtr = priorityExpr(hashSet) 
+            { IntrprtrMult = new funcMultiplication(IntrprtrMult, Intrprtr, IntrprtrMult.findLNumber()); } )* // current result at that point in time 
+                { return IntrprtrMult; } // return final result 
+}
+
+TOKEN: {
+    < addition: "+" >
+}
+
+// Matching for a additive result is set up, taking in all valid parameter names as input
+
+interpreter additionRes( LinkedHashSet<String> validStr) : 
+    { interpreter Intrprtr; } 
+
+    // will return a expression of the next expression of highest priority if additive result cannot be matched
+
+        { Intrprtr = multiplication(validStr) Intrprtr = initisAddRes(validStr, Intrprtr) 
+            { return Intrprtr; }
+}
+
+// will complete the actual matching of a additive result
+
+interpreter initisAddRes(LinkedHashSet<String> validStr, interpreter IntrprtrMult) : 
+    { interpreter Intrprtr; } 
+        { ( <addition> Intrprtr = multiplication(validStr) 
+            { IntrprtrMult = new funcAddition(IntrprtrMult, Intrprtr , IntrprtrMult.findLNumber()); } )* // current sum
+                { return IntrprtrMult; }
+                // return the final sum after addition
+}
+
+
+
+TOKEN:{ 
+    < leftBracket: "(" >
+}
+
+TOKEN:{ 
+    < leftBrace: "{" >
+}
+
+TOKEN:{ 
+    < rightBracket: ")" >
+}
+
+TOKEN:{ 
+    < rightBrace: "}" >
+}
+
+TOKEN:{ 
+    < blankSpace: " " >
+}
+
+TOKEN:{ 
+    < keywordDEF: "DEF" >
+}
+
+TOKEN:{ 
+    < keywordMAIN: "MAIN" >
+}
+
+TOKEN:{ 
+     < lineBreaks: ";" ("\n" | "\r\n" | "\r" ) >
+}
+
+TOKEN:{ 
+    < INTEGER: ( ["0"-"9"] )+ >  
+}
+
+TOKEN:{ 
+    < upCase: ( ["A"-"Z"] )+ >
+}
+
+TOKEN:{
+    < extraSpace: ("  ") >
+}
+
+TOKEN:{ 
+    < lowCase : ( ["a"-"z"] )+ >
+}
+
+TOKEN_MGR_DECLS : {
+    TreeMap <String, wholeFunc> funcs = new TreeMap <String, wholeFunc> ();
+}
